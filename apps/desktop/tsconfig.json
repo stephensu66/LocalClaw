@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@openclaw/web-app/*": ["../web/src/*"]
+    }
+  },
+  "include": ["src", "../web/src"]
+}
