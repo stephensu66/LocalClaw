@@ -7,8 +7,7 @@ const LOCALE_KEY = 'openclaw_locale';
 function detectLocale(): Locale {
   const stored = localStorage.getItem(LOCALE_KEY);
   if (stored === 'zh' || stored === 'en') return stored;
-  const nav = navigator.language?.toLowerCase() ?? 'en';
-  return nav.startsWith('zh') ? 'zh' : 'en';
+  return 'zh';
 }
 
 interface I18nState {

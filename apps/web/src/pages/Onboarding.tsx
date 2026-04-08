@@ -12,6 +12,7 @@ import { useI18n } from '../i18n';
 import { getBackendModelName } from '../data/modelProviders';
 import { getTier1Options, parseModelName, resolveProviderBaseUrl, type Tier1Entry } from '../data/modelCatalog';
 import { pickDirectory } from '../utils/dirPicker';
+import { api, type SetupStatusResponse, type SetupStepResult } from '../api/client';
 
 function formatInputTypeLabel(input: string | undefined, locale: 'zh' | 'en') {
   if (!input) return null;
@@ -23,6 +24,11 @@ function formatInputTypeLabel(input: string | undefined, locale: 'zh' | 'en') {
   if (normalized === 'audio') return '音频';
   if (normalized === 'video') return '视频';
   return input;
+}
+
+function formatGb(bytes: number | null): string {
+  if (bytes == null) return '-';
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 const defaultForm: LocalConfigInput = {
@@ -49,9 +55,89 @@ export function Onboarding() {
   const [tier3, setTier3] = useState<string>('');
   const [isTierMenuOpen, setIsTierMenuOpen] = useState(false);
   const tierMenuRef = useRef<HTMLDivElement | null>(null);
+  const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupRunning, setSetupRunning] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const [setupSteps, setSetupSteps] = useState<SetupStepResult[]>([]);
+  const [setupConsentNode, setSetupConsentNode] = useState(false);
+  const [setupConsentOpenClaw, setSetupConsentOpenClaw] = useState(false);
+  const [setupInstallDir, setSetupInstallDir] = useState('');
+  const [setupWorkDir, setSetupWorkDir] = useState('');
+
+  const setupText = locale === 'zh'
+    ? {
+      title: '系统环境准备（推荐先完成）',
+      desc: '自动检查 Node 24 与 OpenClaw，并在授权后执行自动安装/配置。',
+      refresh: '刷新状态',
+      running: '执行中...',
+      run: '一键自动准备',
+      nodeConsent: '同意安装/修复 Node 24（系统级变更）',
+      openclawConsent: '同意安装/修复 OpenClaw（系统级变更）',
+      installDir: 'OpenClaw 安装目录（可选）',
+      workDir: '默认工作目录（可选）',
+      browse: '浏览',
+      node: 'Node',
+      openclaw: 'OpenClaw',
+      required: '要求',
+      token: 'Gateway Token',
+      precheck: '路径与磁盘预检',
+      minSpace: '最低可用空间',
+      lastRun: '上次执行',
+      yes: '是',
+      no: '否',
+    }
+    : {
+      title: 'System Setup (Recommended)',
+      desc: 'Check Node 24 and OpenClaw, then run automated install/config after explicit consent.',
+      refresh: 'Refresh',
+      running: 'Running...',
+      run: 'Run Auto Setup',
+      nodeConsent: 'Allow Node 24 installation/repair (system-level change)',
+      openclawConsent: 'Allow OpenClaw installation/repair (system-level change)',
+      installDir: 'OpenClaw install directory (optional)',
+      workDir: 'Default work directory (optional)',
+      browse: 'Browse',
+      node: 'Node',
+      openclaw: 'OpenClaw',
+      required: 'Required',
+      token: 'Gateway token',
+      precheck: 'Path and disk precheck',
+      minSpace: 'Minimum free disk',
+      lastRun: 'Last run',
+      yes: 'Yes',
+      no: 'No',
+    };
+
+  const stepList = setupSteps.length > 0
+    ? setupSteps.map((step) => ({
+      id: step.id,
+      status: step.status,
+      message: step.message,
+      at: '',
+    }))
+    : (setupStatus?.run.steps ?? []);
+
+  const loadSetupStatus = async () => {
+    setSetupLoading(true);
+    setSetupError(null);
+    try {
+      const status = await api.getSetupStatus();
+      setSetupStatus(status);
+      setSetupConsentNode(status.consent.nodeInstall);
+      setSetupConsentOpenClaw(status.consent.openclawInstall);
+      setSetupInstallDir(status.paths.openclawInstallDir ?? '');
+      setSetupWorkDir(status.paths.workDir ?? '');
+    } catch (error: any) {
+      setSetupError(error?.message ?? 'Failed to load setup status');
+    } finally {
+      setSetupLoading(false);
+    }
+  };
 
   useEffect(() => {
     void loadConfig();
+    void loadSetupStatus();
   }, [loadConfig]);
 
   useEffect(() => {
@@ -182,12 +268,128 @@ export function Onboarding() {
     navigate('/');
   };
 
+  const runAutoSetup = async () => {
+    setSetupRunning(true);
+    setSetupError(null);
+    setSetupSteps([]);
+    try {
+      const result = await api.runSetup({
+        consent: {
+          nodeInstall: setupConsentNode,
+          openclawInstall: setupConsentOpenClaw,
+        },
+        paths: {
+          openclawInstallDir: setupInstallDir.trim() || null,
+          workDir: setupWorkDir.trim() || null,
+        },
+      });
+      setSetupStatus(result.status);
+      setSetupSteps(result.steps);
+      if (result.status.paths.workDir) {
+        setForm((prev) => ({
+          ...prev,
+          workDirAuto: false,
+          workDir: result.status.paths.workDir!,
+        }));
+      }
+      await loadConfig();
+    } catch (error: any) {
+      setSetupError(error?.message ?? 'Auto setup failed');
+    } finally {
+      setSetupRunning(false);
+    }
+  };
+
   return (
     <div className="grid" style={{ maxWidth: 720, margin: '0 auto', gap: 24 }}>
       <div>
         <h2 className="page-title">{t('welcomeTitle')}</h2>
         <p className="muted">{t('welcomeDesc')}</p>
       </div>
+
+      <Card>
+        <h3 style={{ marginTop: 0 }}>{setupText.title}</h3>
+        <p className="muted">{setupText.desc}</p>
+        <div className="grid" style={{ gap: 10 }}>
+          <div className="muted">
+            {setupText.node}: {setupStatus?.node.version ?? '-'} | {setupText.required}: {setupStatus?.node.requiredMajor ?? 24}
+            {' '}| {setupStatus?.node.satisfies ? 'OK' : 'NOT READY'}
+          </div>
+          <div className="muted">
+            {setupText.openclaw}: {setupStatus?.openclaw.version ?? '-'}
+            {' '}| {setupStatus?.openclaw.installed ? 'OK' : 'NOT INSTALLED'}
+          </div>
+          <div className="muted">
+            {setupText.token}: {setupStatus?.gateway.tokenFound ? setupText.yes : setupText.no}
+          </div>
+          <div className="muted">
+            {setupText.precheck}: {setupStatus?.precheck.ok ? 'OK' : 'NOT READY'}
+            {' '}| {setupText.minSpace}: {setupStatus?.precheck.minFreeGb ?? 5} GB
+          </div>
+          {(setupStatus?.precheck.checks ?? []).map((check) => (
+            <div key={check.id} className="muted">
+              {check.id}: {check.ok ? 'OK' : 'CHECK'} | {check.message}
+              {' '}| free: {formatGb(check.freeBytes)}
+            </div>
+          ))}
+          <div className="muted">
+            {setupText.lastRun}: {setupStatus?.run.status ?? 'idle'}
+            {setupStatus?.run.error ? ` | ${setupStatus.run.error}` : ''}
+          </div>
+          <Switch checked={setupConsentNode} onChange={(e) => setSetupConsentNode(e.target.checked)}>
+            {setupText.nodeConsent}
+          </Switch>
+          <Switch checked={setupConsentOpenClaw} onChange={(e) => setSetupConsentOpenClaw(e.target.checked)}>
+            {setupText.openclawConsent}
+          </Switch>
+          <label>
+            {setupText.installDir}
+            <Input
+              placeholder={locale === 'zh' ? '/path/to/openclaw' : '/path/to/openclaw'}
+              value={setupInstallDir}
+              onChange={(e) => setSetupInstallDir(e.target.value)}
+            />
+          </label>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <Button
+              className="secondary"
+              type="button"
+              onClick={async () => {
+                const picked = await pickDirectory();
+                if (picked) setSetupInstallDir(picked);
+              }}
+            >
+              {setupText.browse}
+            </Button>
+          </div>
+          <label>
+            {setupText.workDir}
+            <Input
+              placeholder="/Users/.../OpenClaw"
+              value={setupWorkDir}
+              onChange={(e) => setSetupWorkDir(e.target.value)}
+            />
+          </label>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Button className="secondary" type="button" onClick={loadSetupStatus} disabled={setupLoading}>
+              {setupText.refresh}
+            </Button>
+            <Button type="button" onClick={runAutoSetup} disabled={setupRunning || setupStatus?.run.status === 'running'}>
+              {setupRunning ? setupText.running : setupText.run}
+            </Button>
+          </div>
+          {setupError && <div className="muted" style={{ color: '#b42318' }}>{setupError}</div>}
+          {stepList.length > 0 && (
+            <div className="muted">
+              {stepList.map((step, index) => (
+                <div key={`${step.id}-${step.message}-${step.at}-${index}`}>
+                  [{step.status}] {step.id}: {step.message}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
 
       <Card>
         <div className="form-row">

@@ -1,0 +1,9 @@
+/Users/gaozijian/Desktop/AI/openclaw-plugins/apps/desktop/src-tauri/target/debug/deps/unicode_segmentation-00f87b4f44db1146.d: /Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/lib.rs /Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/grapheme.rs /Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/sentence.rs /Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/word.rs /Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/tables.rs
+
+/Users/gaozijian/Desktop/AI/openclaw-plugins/apps/desktop/src-tauri/target/debug/deps/libunicode_segmentation-00f87b4f44db1146.rmeta: /Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/lib.rs /Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/grapheme.rs /Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/sentence.rs /Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/word.rs /Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/tables.rs
+
+/Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/lib.rs:
+/Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/grapheme.rs:
+/Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/sentence.rs:
+/Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/word.rs:
+/Users/gaozijian/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/unicode-segmentation-1.13.1/src/tables.rs:

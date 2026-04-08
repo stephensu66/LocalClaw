@@ -59,6 +59,91 @@ export interface AgentWorkspaceResponse {
   defaultWorkspace: string | null;
 }
 
+export interface SetupStatusResponse {
+  checkedAt: string;
+  mode: 'mock' | 'real';
+  ready: boolean;
+  node: {
+    installed: boolean;
+    version: string | null;
+    major: number | null;
+    requiredMajor: number;
+    satisfies: boolean;
+  };
+  openclaw: {
+    installed: boolean;
+    version: string | null;
+    meetsMinVersion: boolean;
+    minVersion: string | null;
+  };
+  gateway: {
+    tokenFound: boolean;
+    gatewayCommandConfigured: boolean;
+    onboardingCommandConfigured: boolean;
+  };
+  consent: {
+    nodeInstall: boolean;
+    openclawInstall: boolean;
+  };
+  paths: {
+    openclawInstallDir: string | null;
+    workDir: string | null;
+  };
+  precheck: {
+    ok: boolean;
+    minFreeGb: number;
+    checks: Array<{
+      id: 'openclawInstallDir' | 'workDir';
+      path: string | null;
+      exists: boolean | null;
+      writable: boolean | null;
+      freeBytes: number | null;
+      requiredFreeBytes: number;
+      hasEnoughSpace: boolean | null;
+      ok: boolean;
+      message: string;
+    }>;
+  };
+  run: {
+    runId: string | null;
+    status: 'idle' | 'running' | 'succeeded' | 'failed';
+    startedAt: string | null;
+    finishedAt: string | null;
+    currentStepId: string | null;
+    error: string | null;
+    resumable: boolean;
+    steps: Array<{
+      id: string;
+      status: 'succeeded' | 'skipped' | 'failed';
+      message: string;
+      at: string;
+    }>;
+  };
+}
+
+export interface SetupUpdateInput {
+  consent?: {
+    nodeInstall?: boolean;
+    openclawInstall?: boolean;
+  };
+  paths?: {
+    openclawInstallDir?: string | null;
+    workDir?: string | null;
+  };
+}
+
+export interface SetupStepResult {
+  id: string;
+  status: 'succeeded' | 'skipped' | 'failed';
+  message: string;
+}
+
+export interface SetupRunResponse {
+  ok: boolean;
+  steps: SetupStepResult[];
+  status: SetupStatusResponse;
+}
+
 function withQuery(path: string, query?: Record<string, string | null | undefined>): string {
   if (!query) return path;
   const params = new URLSearchParams();
@@ -135,6 +220,17 @@ export const api = {
     request<AgentCreateResponse>('/api/agent/create', {
       method: 'POST',
       body: JSON.stringify(input),
+    }),
+  getSetupStatus: () => request<SetupStatusResponse>('/api/setup/status'),
+  updateSetupState: (input: SetupUpdateInput) =>
+    request<SetupStatusResponse>('/api/setup/state', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
+  runSetup: (input?: SetupUpdateInput) =>
+    request<SetupRunResponse>('/api/setup/run', {
+      method: 'POST',
+      body: JSON.stringify(input ?? {}),
     }),
 };
 

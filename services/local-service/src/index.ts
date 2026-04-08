@@ -6,6 +6,7 @@ import { SettingsService } from './services/settingsService';
 import { PermissionService } from './modules/permissions/permissionService';
 import { TaskLogService } from './modules/tasks/taskLogService';
 import { TaskService } from './modules/tasks/taskService';
+import { SetupService } from './modules/setup/setupService';
 import { createOpenClawAdapter } from './openclaw/factory';
 import { createApp } from './app';
 import { ensureOpenClawInstalled, runNonInteractiveOnboarding, startGateway, readGatewayToken } from './openclaw/installer';
@@ -36,6 +37,7 @@ async function main() {
   const permissionService = new PermissionService(prisma, sseHub);
   const taskLogService = new TaskLogService(prisma, sseHub);
   const adapter = createOpenClawAdapter(env.openclawMode);
+  const setupService = new SetupService(settingsService, adapter);
 
   if (env.openclawMode === 'real') {
     try {
@@ -65,6 +67,7 @@ async function main() {
     settingsService,
     permissionService,
     taskService,
+    setupService,
     adapter,
   });
 

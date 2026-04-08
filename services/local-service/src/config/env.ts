@@ -7,10 +7,15 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const envSchema = z.object({
   PORT: z.coerce.number().default(3980),
+  NODE_REQUIRED_MAJOR: z.coerce.number().default(24),
+  SETUP_MIN_FREE_GB: z.coerce.number().default(5),
+  NODE_INSTALL_CMD: z.string().optional(),
   OPENCLAW_MODE: z.enum(['mock', 'real']).default('mock'),
   OPENCLAW_BINARY: z.string().default('openclaw'),
   OPENCLAW_INSTALL_SH: z.string().default('https://openclaw.ai/install.sh'),
   OPENCLAW_INSTALL_PS: z.string().default('https://openclaw.ai/install.ps1'),
+  OPENCLAW_INSTALL_CMD: z.string().optional(),
+  OPENCLAW_MIN_VERSION: z.string().optional(),
   OPENCLAW_ONBOARD_CMD: z.string().optional(),
   OPENCLAW_GATEWAY_CMD: z.string().optional(),
   OPENCLAW_RUN_CMD: z.string().optional(),
@@ -50,12 +55,34 @@ const dbPath = path.join(appDataDir, 'openclaw.db');
 const databaseUrl = process.env.DATABASE_URL ?? `file:${dbPath}`;
 process.env.DATABASE_URL = databaseUrl;
 
+const defaultAllowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
+  'tauri://localhost',
+  'https://tauri.localhost',
+];
+
+function parseAllowedOrigins(value?: string): string[] {
+  if (!value) return defaultAllowedOrigins;
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export const env = {
   port: raw.PORT,
+  nodeRequiredMajor: raw.NODE_REQUIRED_MAJOR,
+  setupMinFreeGb: raw.SETUP_MIN_FREE_GB,
+  nodeInstallCmd: normalizeOptionalString(raw.NODE_INSTALL_CMD),
   openclawMode: raw.OPENCLAW_MODE,
   openclawBinary: raw.OPENCLAW_BINARY,
   openclawInstallSh: raw.OPENCLAW_INSTALL_SH,
   openclawInstallPs: raw.OPENCLAW_INSTALL_PS,
+  openclawInstallCmd: normalizeOptionalString(raw.OPENCLAW_INSTALL_CMD),
+  openclawMinVersion: normalizeOptionalString(raw.OPENCLAW_MIN_VERSION),
   openclawOnboardCmd: raw.OPENCLAW_ONBOARD_CMD,
   openclawGatewayCmd: raw.OPENCLAW_GATEWAY_CMD,
   openclawRunCmd: raw.OPENCLAW_RUN_CMD,
@@ -70,9 +97,7 @@ export const env = {
   openclawWebFetchEnabled: parseOptionalBoolean(raw.OPENCLAW_WEB_FETCH_ENABLED),
   appDataDir,
   databaseUrl,
-  allowedOrigins: raw.ALLOWED_ORIGINS
-    ? raw.ALLOWED_ORIGINS.split(',').map((s) => s.trim())
-    : ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  allowedOrigins: parseAllowedOrigins(raw.ALLOWED_ORIGINS),
   logLevel: raw.LOG_LEVEL,
 };
 

@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "lint": "echo 'no lint'",
     "test:web-tools": "tsx scripts/web-tools-config.test.ts",
+    "reset:state": "tsx scripts/reset-state.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
