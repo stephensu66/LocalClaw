@@ -197,12 +197,35 @@ export class SettingsService {
   }
 
   async hasOpenClawConfig(): Promise<boolean> {
-    try {
-      await fs.access(OPENCLAW_CONFIG_PATH);
-      return true;
-    } catch {
-      return false;
-    }
+    const config = await this.readOpenClawConfigFile();
+    if (!config) return false;
+
+    const primaryModel = getNestedString(config, ['agents', 'defaults', 'model', 'primary']);
+    if (!primaryModel) return false;
+
+    const modelRef = parseModelRef(primaryModel);
+    if (!modelRef) return false;
+
+    const providerId = modelRef.providerId.trim().toLowerCase();
+    if (providerId === 'ollama') return true;
+
+    const localConfig = await this.prisma.localConfig.findUnique({
+      where: { id: LOCAL_CONFIG_ID },
+      select: { apiKeyCiphertext: true },
+    });
+    if (Boolean(localConfig?.apiKeyCiphertext)) return true;
+
+    const modelsSection = isRecord(config.models) ? config.models : undefined;
+    const providersRaw = modelsSection?.providers;
+    const providers = isRecord(providersRaw) ? (providersRaw as Record<string, JsonRecord>) : undefined;
+    const providerEntry = providers?.[providerId];
+    const provider = isRecord(providerEntry) ? providerEntry : undefined;
+    const providerApiKey = normalizeOptionalString(provider?.apiKey as string | undefined);
+    if (providerApiKey) return true;
+
+    // Missing model runtime credentials should be treated as "not onboarded"
+    // so first-run users are sent to onboarding instead of getting stuck.
+    return false;
   }
 
   private async readOpenClawConfigFile(): Promise<OpenClawConfigFile | null> {

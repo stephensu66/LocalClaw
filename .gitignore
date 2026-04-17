@@ -6,3 +6,6 @@ build/
 .vscode/
 
 .env
+
+apps/desktop/src-tauri/resources/runtime/node
+apps/desktop/src-tauri/resources/runtime/

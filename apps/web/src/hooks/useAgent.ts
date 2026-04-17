@@ -38,6 +38,8 @@ export function useAgentModelList() {
       const response = await api.listAgentModels();
       return response.models;
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 }
 

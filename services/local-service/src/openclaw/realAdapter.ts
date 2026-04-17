@@ -21,6 +21,7 @@ import type { AgentHealth, EnvCheckResult, LogLevel, TaskStatus } from '@opencla
 import { env } from '../config/env';
 import { runCommand } from './cli';
 import { getOpenClawProvider, getBackendModelName } from './providerMap';
+import { buildOpenClawLaunch, buildOpenClawProcessEnv, withNvmUse } from './runtimeEnv';
 
 interface TaskRecord {
   status: TaskStatus;
@@ -786,10 +787,13 @@ export class OpenClawRealAdapter implements OpenClawAdapter {
     return new Promise((resolve) => {
       const binary = this.getOpenClawBinary();
       const timeoutMs = options?.timeoutMs ?? 120_000;
-      const proc = spawn(binary, args, {
+      const commandEnv = buildOpenClawProcessEnv();
+      const launch = buildOpenClawLaunch(binary, args, commandEnv);
+      const proc = spawn(launch.program, launch.args, {
         cwd: options?.cwd,
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
+        env: commandEnv,
       });
 
       let stdout = '';
@@ -857,8 +861,10 @@ export class OpenClawRealAdapter implements OpenClawAdapter {
     }
   }
 
-  async listModels(): Promise<string[]> {
-    const result = await this.runOpenClawCommand(['models', 'list']);
+  async listModels(options?: { timeoutMs?: number }): Promise<string[]> {
+    const result = await this.runOpenClawCommand(['models', 'list'], {
+      timeoutMs: options?.timeoutMs ?? 120_000,
+    });
     const models = parseModelList(result.stdout);
     if (models.length > 0) {
       return models;
@@ -1243,10 +1249,20 @@ export class OpenClawRealAdapter implements OpenClawAdapter {
           .replace(/\{workspace\}/g, workspace.replace(/"/g, '\\"'))
           .replace(/\{agent\}/g, resolvedAgentName.replace(/"/g, '\\"'))
           .replace(/\{sessionId\}/g, resolvedSessionId.replace(/"/g, '\\"'));
-        const shellCommand = `cd '${workspace.replace(/'/g, `'\\''`)}' && ${command}`;
-        return spawn(shellCommand, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
+        const shellCommand = withNvmUse(
+          `cd '${workspace.replace(/'/g, `'\\''`)}' && ${command}`
+        );
+        return spawn(shellCommand, {
+          shell: true,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          env: buildOpenClawProcessEnv(),
+        });
       })()
-      : spawn(this.getOpenClawBinary(), defaultArgs, { cwd: workspace, stdio: ['ignore', 'pipe', 'pipe'] });
+      : spawn(this.getOpenClawBinary(), defaultArgs, {
+        cwd: workspace,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: buildOpenClawProcessEnv(),
+      });
 
     let stdout = '';
     let stderr = '';

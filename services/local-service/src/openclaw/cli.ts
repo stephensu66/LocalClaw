@@ -1,4 +1,5 @@
 import { spawn } from 'child_process';
+import { buildOpenClawProcessEnv, withNvmUse } from './runtimeEnv';
 
 export interface CommandResult {
   code: number;
@@ -8,7 +9,11 @@ export interface CommandResult {
 
 export function runCommand(command: string): Promise<CommandResult> {
   return new Promise((resolve) => {
-    const proc = spawn(command, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const proc = spawn(withNvmUse(command), {
+      shell: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: buildOpenClawProcessEnv(),
+    });
     let stdout = '';
     let stderr = '';
     proc.stdout.on('data', (chunk) => (stdout += chunk.toString()));

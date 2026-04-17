@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 import type { AgentCreateStepResult, OpenClawAdapter } from '../../openclaw/adapter';
 
@@ -49,6 +50,14 @@ type AgentCreateFailure = {
   steps: AgentCreateStepResult[];
 };
 
+type ModelListReason = 'not_configured' | 'timeout' | 'cli_unavailable' | 'error';
+
+interface ModelListResponse {
+  models: string[];
+  ready: boolean;
+  reason?: ModelListReason;
+}
+
 function isAgentCreateFailure(error: unknown): error is AgentCreateFailure {
   if (!error || typeof error !== 'object') return false;
   const candidate = error as Partial<AgentCreateFailure>;
@@ -69,28 +78,128 @@ function statusFromCreateErrorCode(code: string): number {
   return 500;
 }
 
+type AsyncRouteHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
+
+function asyncHandler(handler: AsyncRouteHandler) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    void handler(req, res, next).catch(next);
+  };
+}
+
+function classifyModelListFailure(error: unknown): {
+  reason: ModelListReason;
+  degraded: boolean;
+  detail: string;
+} {
+  const detail = String((error as any)?.message ?? error ?? '').trim();
+  const text = detail.toLowerCase();
+
+  if (text.includes('timeout')) {
+    return { reason: 'timeout', degraded: true, detail };
+  }
+
+  if (
+    text.includes('enoent')
+    || text.includes('command not found')
+    || (text.includes('openclaw') && text.includes('not found'))
+    || text.includes('cli unavailable')
+  ) {
+    return { reason: 'cli_unavailable', degraded: true, detail };
+  }
+
+  if (
+    text.includes('api key')
+    || text.includes('unauthorized')
+    || text.includes('forbidden')
+    || text.includes('401')
+    || text.includes('403')
+    || text.includes('not configured')
+    || text.includes('missing')
+    || text.includes('invalid model')
+  ) {
+    return { reason: 'not_configured', degraded: true, detail };
+  }
+
+  return { reason: 'error', degraded: false, detail };
+}
+
 export function createAgentRouter(adapter: OpenClawAdapter): Router {
   const router = Router();
 
-  router.get('/status', async (_req, res) => {
+  router.get('/status', asyncHandler(async (_req, res) => {
     res.json(await adapter.getAgentHealth());
-  });
+  }));
 
-  router.post('/env-check', async (_req, res) => {
+  router.post('/env-check', asyncHandler(async (_req, res) => {
     res.json(await adapter.checkEnvironment());
-  });
+  }));
 
-  router.get('/list', async (_req, res) => {
+  router.get('/list', asyncHandler(async (_req, res) => {
     const agents = await adapter.listAgents();
     res.json({ agents });
-  });
+  }));
 
-  router.get('/models', async (_req, res) => {
-    const models = await adapter.listModels();
-    res.json({ models });
-  });
+  router.get('/models', asyncHandler(async (_req, res) => {
+    const startedAt = Date.now();
+    console.info(
+      JSON.stringify({
+        scope: 'agent.models',
+        event: 'start',
+        startedAt: new Date(startedAt).toISOString(),
+      })
+    );
 
-  router.get('/model', async (req, res) => {
+    try {
+      const models = await adapter.listModels({ timeoutMs: 8_000 });
+      const durationMs = Date.now() - startedAt;
+      const ready = models.length > 0;
+      const payload: ModelListResponse = {
+        models,
+        ready,
+        ...(ready ? {} : { reason: 'not_configured' }),
+      };
+
+      console.info(
+        JSON.stringify({
+          scope: 'agent.models',
+          event: 'finish',
+          durationMs,
+          ready,
+          reason: payload.reason ?? null,
+          modelsCount: models.length,
+        })
+      );
+      res.json(payload);
+    } catch (error) {
+      const durationMs = Date.now() - startedAt;
+      const classified = classifyModelListFailure(error);
+
+      console.warn(
+        JSON.stringify({
+          scope: 'agent.models',
+          event: 'failed',
+          durationMs,
+          reason: classified.reason,
+          degraded: classified.degraded,
+          detail: classified.detail,
+        })
+      );
+
+      if (classified.degraded) {
+        const payload: ModelListResponse = {
+          models: [],
+          ready: false,
+          reason: classified.reason,
+        };
+        res.json(payload);
+        return;
+      }
+
+      throw error;
+    }
+  }));
+
+  router.get('/model', asyncHandler(async (req, res) => {
     const parsed = getAgentModelQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({
@@ -101,9 +210,9 @@ export function createAgentRouter(adapter: OpenClawAdapter): Router {
     }
     const result = await adapter.getAgentModel(parsed.data.agentName);
     res.json(result);
-  });
+  }));
 
-  router.get('/workspace', async (req, res) => {
+  router.get('/workspace', asyncHandler(async (req, res) => {
     const parsed = getAgentWorkspaceQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({
@@ -114,9 +223,9 @@ export function createAgentRouter(adapter: OpenClawAdapter): Router {
     }
     const result = await adapter.getAgentWorkspace(parsed.data.agentName);
     res.json(result);
-  });
+  }));
 
-  router.put('/model', async (req, res) => {
+  router.put('/model', asyncHandler(async (req, res) => {
     const parsed = setAgentModelSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({
@@ -154,9 +263,9 @@ export function createAgentRouter(adapter: OpenClawAdapter): Router {
 
     const result = await adapter.setAgentModel(input.agentName, input.model);
     res.json(result);
-  });
+  }));
 
-  router.post('/create', async (req, res) => {
+  router.post('/create', asyncHandler(async (req, res) => {
     const parsed = createAgentSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({
@@ -214,7 +323,7 @@ export function createAgentRouter(adapter: OpenClawAdapter): Router {
       }
       throw error;
     }
-  });
+  }));
 
   return router;
 }

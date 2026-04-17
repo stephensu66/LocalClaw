@@ -12,7 +12,7 @@
 典型调用链路：
 `Web/Desktop -> Local Service API -> OpenClaw Adapter(mock/real) -> OpenClaw`
 
-`Local Service` 是本项目的核心运行时，主要负责把 OpenClaw CLI 能力产品化为可视化、可配置、可控的本地服务。
+`Local Service` 是本项目的核心运行时，主要负责把 OpenClaw CLI 能力产品化为可视化、可配置、可控的本地
 
 ## Local Service 核心职责
 - 对外统一 API：提供 `/api/config`、`/api/tasks`、`/api/permissions`、`/api/agent`、`/api/events`（SSE）等接口。

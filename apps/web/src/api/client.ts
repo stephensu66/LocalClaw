@@ -59,6 +59,14 @@ export interface AgentWorkspaceResponse {
   defaultWorkspace: string | null;
 }
 
+export type AgentModelsReadyReason = 'not_configured' | 'timeout' | 'cli_unavailable' | 'error';
+
+export interface AgentModelsResponse {
+  models: string[];
+  ready?: boolean;
+  reason?: AgentModelsReadyReason;
+}
+
 export interface SetupStatusResponse {
   checkedAt: string;
   mode: 'mock' | 'real';
@@ -206,7 +214,8 @@ export const api = {
   getSession: (sessionId: string, agentName?: string | null) =>
     request<OpenClawSessionRecords>(withQuery(`/api/sessions/${sessionId}`, { agentName })),
   listAgents: () => request<{ agents: string[] }>('/api/agent/list'),
-  listAgentModels: () => request<{ models: string[] }>('/api/agent/models'),
+  listAgentModels: (options: RequestInit = {}) =>
+    request<AgentModelsResponse>('/api/agent/models', options),
   getAgentModel: (agentName: string) =>
     request<AgentModelResponse>(withQuery('/api/agent/model', { agentName })),
   getAgentWorkspace: (agentName: string) =>

@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { create } from 'zustand';
 
 export type Locale = 'zh' | 'en';
@@ -144,6 +145,15 @@ const translations = {
     loadingAgents: 'Loading agents...',
     gatewayStartingTitle: 'Starting up, please wait',
     gatewayStartingDesc: 'Gateway is starting. You will enter the app automatically after it is ready.',
+    gatewayPreparingEnvTitle: 'Configuring environment',
+    gatewayPreparingEnvDesc: 'Preparing model runtime. You will enter the app automatically after setup is complete.',
+    gatewayModelNotReadyNotice: 'Model runtime is not ready yet. Complete model/API key settings in onboarding or settings.',
+    gatewayModelCheckTimeoutNotice: 'Model check timed out. Entering app now; complete model settings in onboarding or settings.',
+    gatewayCliUnavailableNotice: 'OpenClaw CLI is not ready. Entering app now; complete setup in onboarding or settings.',
+    gatewayStartFailedTitle: 'Startup failed',
+    gatewayStartFailedDesc: 'Local service failed to start. Check logs and retry.',
+    gatewayRetry: 'Retry',
+    gatewayLogPathLabel: 'Log file',
     modelSelector: 'Model',
     loadingAgentModel: 'Loading current model...',
     updatingAgentModel: 'Applying model...',
@@ -273,6 +283,15 @@ const translations = {
     loadingAgents: '正在加载 Agent 列表...',
     gatewayStartingTitle: '正在启动中，请稍等',
     gatewayStartingDesc: 'Gateway 正在启动，准备完成后会自动进入应用。',
+    gatewayPreparingEnvTitle: '正在配置环境',
+    gatewayPreparingEnvDesc: '正在检查模型运行环境并加载模型列表，完成后会自动进入应用。',
+    gatewayModelNotReadyNotice: '模型运行环境尚未就绪，请在引导页或设置中完成模型/API Key 配置。',
+    gatewayModelCheckTimeoutNotice: '模型检查超时，已先进入应用；请在引导页或设置中完成模型配置。',
+    gatewayCliUnavailableNotice: 'OpenClaw CLI 尚未就绪，已先进入应用；请在引导页或设置中完成环境配置。',
+    gatewayStartFailedTitle: '启动失败',
+    gatewayStartFailedDesc: '本地服务启动失败，请查看日志后重试。',
+    gatewayRetry: '重试',
+    gatewayLogPathLabel: '日志文件',
     modelSelector: '模型',
     loadingAgentModel: '正在加载当前模型...',
     updatingAgentModel: '正在应用模型...',
@@ -285,6 +304,9 @@ const translations = {
 
 export function useI18n() {
   const { locale, setLocale } = useI18nStore();
-  const t = (key: keyof typeof translations['en']) => translations[locale][key] ?? key;
+  const t = useCallback(
+    (key: keyof typeof translations['en']) => translations[locale][key] ?? key,
+    [locale]
+  );
   return { locale, setLocale, t, isZh: locale === 'zh' };
 }

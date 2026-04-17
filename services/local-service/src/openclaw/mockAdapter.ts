@@ -108,7 +108,7 @@ export class OpenClawMockAdapter implements OpenClawAdapter {
     return ['main', 'mock'];
   }
 
-  async listModels(): Promise<string[]> {
+  async listModels(_options?: { timeoutMs?: number }): Promise<string[]> {
     return ['openai/gpt-4o', 'anthropic/claude-sonnet-4', 'google/gemini-2.5-pro'];
   }
 

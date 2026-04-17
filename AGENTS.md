@@ -1,23 +1,38 @@
-# Project Agent Rules
 
-## Auto Review Log
-For every user request that is completed, append a short entry to `review.md`.
+# Agent Rules (Project Local)
 
-Each entry should include:
-- `Date`: current local date/time
-- `Question`: 1-2 sentence summary of the user problem/request
-- `Solution`: 1-3 sentence summary of what was changed or answered
+本文件用于约束本仓库内的会话行为，目标是避免遗漏 `summary.md` 记录。
 
-Format example:
+## Summary 记录规则（强制）
+
+1. 每次回答后，必须将本轮内容追加到仓库根目录 `summary.md`。
+2. 追加内容必须包含以下四段：
+- `### 问题`
+- `### 结论`
+- `### 证据`
+- `### 后续动作`
+3. 即使本轮没有代码改动，也必须追加一条运行/排障记录。
+4. 如果由于任何原因未能追加，必须在回复中明确说明失败原因。
+
+## 固定模板
 
 ```md
-## 2026-03-25 22:30
-- Question: ...
-- Solution: ...
+## YYYY-MM-DD Q&A 记录 NN
+
+### 问题
+- ...
+
+### 结论
+- ...
+
+### 证据
+- ...
+
+### 后续动作
+- ...
 ```
 
-Rules:
-- Keep entries concise and factual.
-- Append new entries to the end of the file.
-- Do not rewrite or delete previous entries unless the user explicitly asks.
-- If no file/code changes were made, still record the advice/analysis result.
+## 建议操作
+
+- 优先使用 `npm run summary:add -- "..."` 快速追加骨架。
+- 在骨架基础上补全“结论/证据/后续动作”。

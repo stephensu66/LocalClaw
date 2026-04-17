@@ -78,7 +78,7 @@ export interface OpenClawAdapter {
   checkEnvironment(): Promise<EnvCheckResult>;
   getAgentHealth(): Promise<AgentHealth>;
   listAgents(): Promise<string[]>;
-  listModels(): Promise<string[]>;
+  listModels(options?: { timeoutMs?: number }): Promise<string[]>;
   createAgent(input: AgentCreateInput): Promise<AgentCreateResult>;
   getAgentModel(agentName: string): Promise<AgentModelSelection>;
   setAgentModel(agentName: string, model: string): Promise<AgentModelUpdateResult>;

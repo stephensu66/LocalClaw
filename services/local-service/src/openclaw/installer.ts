@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { buildOpenClawProcessEnv, withNvmUse } from './runtimeEnv';
 
 export interface InstallOptions {
   binaryName: string;
@@ -68,10 +69,12 @@ export function readGatewayToken(): string | null {
 }
 
 async function runShell(command: string): Promise<void> {
+  const commandWithNvm = withNvmUse(command);
   await new Promise<void>((resolve, reject) => {
-    const proc = spawn(command, {
+    const proc = spawn(commandWithNvm, {
       shell: true,
       stdio: 'inherit',
+      env: buildOpenClawProcessEnv(),
     });
 
     proc.on('close', (code) => {
@@ -89,6 +92,7 @@ async function runCommand(cmd: string, args: string[] = [], detached = false): P
       stdio: 'inherit',
       detached,
       shell: false,
+      env: buildOpenClawProcessEnv(),
     });
 
     proc.on('close', (code) => {
@@ -142,10 +146,11 @@ export async function runNonInteractiveOnboarding(command?: string): Promise<voi
 export async function startGateway(command?: string): Promise<void> {
   if (!command) return;
 
-  const proc = spawn(command, {
+  const proc = spawn(withNvmUse(command), {
     shell: true,
     stdio: 'inherit',
     detached: true,
+    env: buildOpenClawProcessEnv(),
   });
 
   proc.unref();

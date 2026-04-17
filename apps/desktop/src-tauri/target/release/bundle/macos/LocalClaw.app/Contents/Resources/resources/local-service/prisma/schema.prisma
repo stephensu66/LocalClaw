@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model LocalConfig {
+  id                   String   @id @default("local")
+  modelMode            String
+  baseUrl              String?
+  customModelName      String?
+  modelName            String   @default("openai/gpt-4o")
+  workDirAuto          Boolean  @default(true)
+  workDir              String
+  notificationsEnabled Boolean  @default(true)
+
+  apiKeyCiphertext     String?
+  apiKeyIv             String?
+  apiKeyTag            String?
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Task {
+  id                      String     @id @default(uuid())
+  title                   String?
+  input                   String
+  status                  String     @default("QUEUED")
+  requiredPermissionsJson String?
+  externalTaskId          String?
+  resultJson              String?
+
+  startedAt               DateTime?
+  completedAt             DateTime?
+  errorMessage            String?
+
+  logs                    TaskLog[]
+
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model TaskLog {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  level     String
+  message   String
+  metaJson  String?
+  createdAt DateTime @default(now())
+}
+
+model PermissionGrant {
+  id        String        @id @default(uuid())
+  key       String        @unique
+  granted   Boolean       @default(false)
+  scopeJson String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model PluginState {
+  id         String       @id @default(uuid())
+  pluginId   String       @unique
+  name       String
+  version    String?
+  enabled    Boolean      @default(true)
+  status     String       @default("ENABLED")
+  configJson String?
+  lastError  String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model AppEvent {
+  id          String   @id @default(uuid())
+  type        String
+  payloadJson String?
+  createdAt   DateTime @default(now())
+}
+
+model EnvironmentCheck {
+  id          String          @id @default(uuid())
+  status      String
+  summary     String
+  detailsJson String?
+  createdAt   DateTime        @default(now())
+}
