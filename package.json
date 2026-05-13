@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "release:desktop:macos": "pnpm --filter @openclaw/desktop release:macos",
+    "release:desktop:windows": "pnpm --filter @openclaw/desktop release:windows",
     "lint": "turbo run lint"
   },
   "devDependencies": {

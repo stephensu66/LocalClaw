@@ -1,0 +1,15 @@
+{
+  "bundle": {
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "windows": {
+      "allowDowngrades": true,
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      }
+    }
+  }
+}

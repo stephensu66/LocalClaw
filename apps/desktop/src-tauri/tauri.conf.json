@@ -9,6 +9,10 @@
     "devUrl": "http://localhost:5173"
   },
   "bundle": {
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "resources": [
       "resources/local-service"
     ]

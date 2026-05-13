@@ -394,3 +394,278 @@ cargo tauri build --no-bundle
 ### 后续动作
 - 使用新包再次验证：进入主界面后不应再因普通渲染回退到“正在配置环境”。
 - 若仍回退，继续抓取当时的前端控制台日志和 `local-service.log`，定位是否存在真正的 `config` 或 `onboarded` 状态变化。
+
+## 2026-04-26 Q&A 记录 13
+
+### 问题
+- 用户询问 `apps/desktop/src-tauri/target/release` 目录中的安装包分别对应什么平台，希望简要说明 mac/win 等差异。
+
+### 结论
+- 当前目录里只有 macOS 构建产物，没有看到 Windows 安装包。
+- `target/release/LocalClaw` 是 macOS 的原生可执行文件，不是安装包。
+- `target/release/bundle/macos/LocalClaw.app` 是 macOS 应用包，可直接在 Finder 中作为应用运行。
+- 未发现常见 Windows 打包结果，例如 `.exe`、`.msi` 或 `bundle/nsis`、`bundle/msi` 目录。
+
+### 证据
+- `ls -lah apps/desktop/src-tauri/target/release` 显示：`LocalClaw`、`LocalClaw.d`、`bundle`、`deps`、`resources`。
+- `file apps/desktop/src-tauri/target/release/LocalClaw` 结果为 `Mach-O 64-bit executable arm64`，说明它是 Apple Silicon 的 macOS 二进制。
+- `find apps/desktop/src-tauri/target/release/bundle/macos -maxdepth 4 -type f -o -type d` 显示存在 `LocalClaw.app/Contents/...`，属于标准 macOS `.app` 结构。
+- `bundle` 目录下仅有 `macos` 子目录，没有 `windows`、`msi`、`nsis` 等 Windows 打包目录。
+
+### 后续动作
+- 如需 Windows 安装包，需要在 Windows 环境或对应交叉打包链路下执行 Tauri 打包，产物通常会出现在 `bundle/msi` 或 `bundle/nsis`。
+- 如需给用户分发 macOS 安装包，可以继续检查是否生成 `.dmg`；当前目录里还没有看到 `.dmg` 文件。
+
+## 2026-04-26 Q&A 记录 14
+
+### 问题
+- 用户追问为什么当前不是正式的 macOS `.dmg` 下载包。
+
+### 结论
+- 直接原因是这个项目此前采用的打包命令就是只生成 `.app`：`cargo tauri build --bundles app --no-sign`，没有要求输出 `.dmg`。
+- 当前 `tauri.conf.json` 里也没有显式配置 `bundle.targets` 为 `dmg`，所以仓库配置层面没有把 `.dmg` 作为默认目标固定下来。
+- `.app` 是可运行的 macOS 应用包，适合开发机本地验证；`.dmg` 更像对外分发用的安装镜像容器。
+- 即使生成了 `.dmg`，如果仍然是 `--no-sign` 且未公证，也通常不能算严格意义上的“正式发行包”。
+
+### 证据
+- `apps/desktop/src-tauri/tauri.conf.json` 的 `bundle` 段目前只有 `resources`，未见 `targets: ["dmg"]` 等配置。
+- `summary.md` 历史记录明确写过打包命令：`cargo tauri build --bundles app --no-sign`。
+- 同一处历史记录也写明：若要 `.dmg`，需改为 `cargo tauri build --bundles app,dmg --no-sign`。
+- 当前产物目录 `apps/desktop/src-tauri/target/release/bundle` 下只有 `macos/LocalClaw.app`，没有 `.dmg` 文件。
+
+### 后续动作
+- 如果目标是内部测试，继续保留 `.app` 即可，路径更直接。
+- 如果目标是用户下载分发，改用 `cargo tauri build --bundles app,dmg`，再补签名与 notarization。
+- 如需，我可以继续把仓库默认打包流程改成输出 `.dmg`，并顺手补一个发布说明。
+
+## 2026-05-02 Q&A 记录 15
+
+### 问题
+- 用户询问为什么直接把 `apps/desktop/src-tauri/target/release/LocalClaw.d` 放到 MacBook 中无法正常打开。
+
+### 结论
+- `LocalClaw.d` 不是 macOS 应用，也不是可执行文件；它是 Rust/Tauri 构建过程中生成的依赖描述文件。
+- 真正可运行的二进制是 `apps/desktop/src-tauri/target/release/LocalClaw`。
+- 更适合拷贝到另一台 Mac 的是 `apps/desktop/src-tauri/target/release/bundle/macos/LocalClaw.app`，而不是 `.d` 文件。
+- 当前二进制是 `arm64` 架构；如果目标 Mac 是 Intel 芯片，也不能直接运行这个二进制。
+
+### 证据
+- `file apps/desktop/src-tauri/target/release/LocalClaw.d` 返回 `ASCII text, with very long lines`，说明它只是文本文件。
+- `sed -n '1,40p' apps/desktop/src-tauri/target/release/LocalClaw.d` 内容是 `LocalClaw` 对前端资源、Rust 源码和 `resources/local-service` 的依赖清单。
+- `ls -la apps/desktop/src-tauri/target/release` 显示同目录下存在可执行文件 `LocalClaw` 以及 `bundle` 目录。
+- `find apps/desktop/src-tauri/target/release/bundle/macos/LocalClaw.app -maxdepth 3 -type f` 显示存在标准 macOS 应用包结构，包括 `Contents/MacOS/LocalClaw` 和 `Contents/Info.plist`。
+- `codesign -dv --verbose=4 apps/desktop/src-tauri/target/release/LocalClaw` 显示该可执行文件为 `Mach-O thin (arm64)`。
+
+### 后续动作
+- 如果只是本机测试，优先运行 `target/release/bundle/macos/LocalClaw.app`。
+- 如果要分发给别人，建议生成 `.app` 或 `.dmg`，不要分发 `.d`。
+- 如果对方 Mac 打开 `.app` 仍失败，继续检查是否是架构不匹配、Gatekeeper 拦截、未签名或资源目录缺失。
+
+## 2026-05-02 Q&A 记录 16
+
+### 问题
+- 用户要求实现 Apple Silicon macOS 临时分享包与下载验证计划，包括默认输出 `.app + .dmg`、签名与 notarization 前置检查、可重复执行的发布命令，以及下载后在干净 Mac 上验证配置流程的说明。
+
+### 结论
+- 已将桌面端默认打包目标改为 `app + dmg`，并新增一套可重复执行的 macOS 发布脚本链路。
+- 新增的发布入口会自动尝试通过 `nvm` 切换到 Node 24，再执行 `cargo tauri build --ci --target aarch64-apple-darwin --bundles app,dmg`。
+- 发布脚本会强制检查 `APPLE_SIGNING_IDENTITY` 和 notarization 凭据，随后验证 `codesign`、`spctl`、`stapler`，计算 DMG 的 SHA-256，并可选执行上传命令生成下载链接。
+- 目前本机未配置 `APPLE_SIGNING_IDENTITY`，所以实际打包流程已推进到签名前置检查并按预期停止，尚未生成最终 notarized `.dmg`。
+
+### 证据
+- 配置更新：`apps/desktop/src-tauri/tauri.conf.json` 的 `bundle.targets` 已加入 `["app", "dmg"]`。
+- 脚本更新：新增 `apps/desktop/scripts/release-macos.mjs`、`apps/desktop/scripts/release-macos.sh`、`scripts/release-desktop-macos.sh`。
+- 命令入口更新：`apps/desktop/package.json` 新增 `release:macos`，根 `package.json` 新增 `release:desktop:macos`。
+- 文档更新：新增 `docs/macos-apple-silicon-release.md`，覆盖环境变量、命令、产物、下载分享钩子和干净机验证步骤。
+- 本机验证：
+  - `node apps/desktop/scripts/release-macos.mjs` 在默认 Node 16 下按预期报错 `Node.js 24.x is required`。
+  - `bash ./scripts/release-desktop-macos.sh` 能自动切到 nvm 的 Node 24，并进一步报错 `APPLE_SIGNING_IDENTITY is required for signed macOS builds.`，说明发布入口与前置检查已生效。
+
+### 后续动作
+- 在本机导入或配置可用的 Apple Developer 签名身份，并设置 notarization 环境变量后重新执行 `bash ./scripts/release-desktop-macos.sh`。
+- 如需自动生成下载链接，设置 `LOCALCLAW_SHARE_COMMAND`，让其上传最终 `.dmg` 并将 URL 输出到 stdout。
+- 生成最终 DMG 后，按 `docs/macos-apple-silicon-release.md` 中的干净机验证步骤完成“下载 -> 安装 -> 打开 -> 配置 -> 检查日志”测试。
+
+## 2026-05-02 Q&A 记录 17
+
+### 问题
+- 用户询问当前 macOS 发布链路是否已经可以直接使用，还是还需要继续做手动配置。
+
+### 结论
+- 发布脚本和文档已经可以直接用，但前提是先补齐 Apple 签名和 notarization 凭据。
+- 当前仓库代码层面已经完成；真正未完成的是本机发布环境配置。
+- 如果不配置 `APPLE_SIGNING_IDENTITY` 和 notarization 相关环境变量，脚本会在前置检查阶段停止，不能产出最终可分发的 notarized `.dmg`。
+
+### 证据
+- 新增的 `bash ./scripts/release-desktop-macos.sh` 已能自动切换到 Node 24 并进入发布流程。
+- 上次本机执行结果停在 `APPLE_SIGNING_IDENTITY is required for signed macOS builds.`，说明代码链路正常，阻塞点是发布凭据。
+- `docs/macos-apple-silicon-release.md` 已明确列出所需环境变量和执行命令。
+
+### 后续动作
+- 先配置 Apple 签名身份与 notarization 环境变量。
+- 如需自动生成下载链接，再额外配置 `LOCALCLAW_SHARE_COMMAND`。
+- 然后执行 `bash ./scripts/release-desktop-macos.sh` 开始正式打包。
+
+## 2026-05-02 Q&A 记录 18
+
+### 问题
+- 用户说明暂时不做 Apple 签名和 notarization，询问是否可以先按未签名方案用于个人测试、内测和朋友试用。
+
+### 结论
+- 可以。对个人测试、内测、朋友试用来说，先用未签名的 `.app` 或 `.dmg` 是可行的。
+- 这种方案的代价是目标 Mac 上大概率会遇到 Gatekeeper 拦截，需要右键“打开”或在系统设置里手动放行一次。
+- 因此它适合小范围试用，不适合正式公开分发。
+
+### 证据
+- 仓库历史中此前一直使用 `cargo tauri build --bundles app --no-sign` 进行本地打包验证。
+- 当前项目已经支持输出 `.app + .dmg`，只是正式签名公证链路还依赖 Apple 凭据。
+- 之前排查已确认真正可运行和可分发的产物应是 `bundle/macos/LocalClaw.app` 或生成后的 `.dmg`，不是 `LocalClaw.d`。
+
+### 后续动作
+- 如果只做小范围试用，可继续使用未签名构建产物并附带一段“首次打开需手动放行”的说明。
+- 如果后续要扩大分发范围，再切换到签名和 notarization 流程。
+
+## 2026-05-02 Q&A 记录 19
+
+### 问题
+- 用户询问当前仓库下“现在打包的正确流程是什么”。
+
+### 结论
+- 当前正确流程分成两种：未签名小范围试用流程，以及签名公证的正式分发流程。
+- 小范围试用时，最直接的是在 `apps/desktop/src-tauri` 下执行 `cargo tauri build --bundles app,dmg --no-sign`。
+- 正式分发时，应先配置 Apple 签名与 notarization 环境变量，再执行 `bash ./scripts/release-desktop-macos.sh`。
+- 当前仓库默认目标已包含 `app + dmg`，真正可分发的产物在 `apps/desktop/src-tauri/target/release/bundle/` 下，而不是 `LocalClaw.d`。
+
+### 证据
+- `apps/desktop/src-tauri/tauri.conf.json` 的 `bundle.targets` 已配置为 `["app", "dmg"]`。
+- 仓库新增了 `apps/desktop/scripts/release-macos.mjs`、`apps/desktop/scripts/release-macos.sh`、`scripts/release-desktop-macos.sh`，用于正式发布流程。
+- 历史验证中，未签名方案一直基于 `cargo tauri build --bundles app --no-sign`；当前已扩展为 `app,dmg`。
+
+### 后续动作
+- 如果只是自己和朋友试用，直接执行未签名构建即可。
+- 如果要给更多人稳定下载，后续补齐 Apple 凭据并走正式发布脚本。
+
+## 2026-05-02 Q&A 记录 20
+
+### 问题
+- 用户在执行 Tauri 打包时遇到 `vite: command not found` 和 `Local package.json exists, but node_modules missing`，需要定位并修复当前打包前置流程。
+
+### 结论
+- 根因一是当前 shell 使用 `Node v16.13.0`，与当前 `pnpm` 版本不兼容。
+- 根因二是工作区依赖未安装，导致 `apps/web` 的 `vite` 不存在。
+- 在安装依赖后，又暴露出一个脚本缺陷：`apps/desktop/scripts/prepare-runtime.mjs` 强制复制 `services/local-service/.env`，但仓库默认只有 `.env.example`，因此首次打包会失败。
+- 已修复：安装了工作区依赖，并将 `prepare-runtime.mjs` 改为“`.env` 存在则复制，不存在则跳过”。
+- 当前 `beforeBuildCommand` 所依赖的两步都已验证通过：`pnpm --filter @openclaw/web build` 和 `pnpm --filter @openclaw/desktop prepare:runtime`。
+
+### 证据
+- 环境检查：
+  - `pnpm -v && node -v` 在默认 shell 下报错，显示当前 Node 为 `v16.13.0`，不满足 `pnpm` 要求。
+  - `nvm version 24` 返回 `v24.15.0`，说明本机已有可用的 Node 24。
+- 依赖状态：
+  - 根目录和 `apps/web` 初始都没有 `node_modules`。
+  - 已执行 `pnpm install` 完成工作区依赖安装。
+- 构建验证：
+  - `pnpm --filter @openclaw/web build` 成功，输出 `apps/web/dist/...`
+  - `pnpm --filter @openclaw/desktop prepare:runtime` 成功，输出 `[desktop] runtime prepared`
+- 代码修复：
+  - `apps/desktop/scripts/prepare-runtime.mjs` 现在不再强依赖缺失的 `.env` 文件。
+
+### 后续动作
+- 后续打包前，先确保当前 shell 切到 Node 24，例如 `nvm use 24`。
+- 小范围试用继续执行：`cd apps/desktop/src-tauri && cargo tauri build --bundles app,dmg --no-sign`
+- 如果需要，我可以继续直接帮你把完整的未签名 `.dmg` 打包命令跑完。
+
+## 2026-05-02 Q&A 记录 21
+
+### 问题
+- 用户要求将当前可用的本地测试配置写入 `.env`，并继续完成未签名打包流程。
+
+### 结论
+- 已新增 `services/local-service/.env`，采用适合个人测试/内测的最小配置：`OPENCLAW_MODE=mock`、`NODE_REQUIRED_MAJOR=24`、`LOG_LEVEL=info` 等。
+- 使用该配置后，Tauri 的 `beforeBuildCommand` 已完整通过，`LocalClaw.app` 成功构建。
+- Tauri 自带的 `bundle_dmg.sh` 在当前环境下仍失败，但这不影响 `.app` 本体。
+- 已改用更朴素的 `hdiutil create` 方式额外生成一个可分享的未签名 DMG：`LocalClaw_0.1.0_aarch64_simple.dmg`。
+
+### 证据
+- 新增文件：`services/local-service/.env`
+- `cargo tauri build --bundles app,dmg --no-sign` 输出显示：
+  - `Built application at: .../target/release/LocalClaw`
+  - `Bundling LocalClaw.app ...` 成功
+  - 失败点仅在 `bundle_dmg.sh`
+- 手工 DMG 生成成功：
+  - `hdiutil create ... LocalClaw_0.1.0_aarch64_simple.dmg`
+  - 输出 `created: /Users/gaozijian/Desktop/AI/LocalClaw/apps/desktop/src-tauri/target/release/bundle/dmg/LocalClaw_0.1.0_aarch64_simple.dmg`
+- 当前产物状态：
+  - `.app`：`apps/desktop/src-tauri/target/release/bundle/macos/LocalClaw.app`
+  - `.dmg`：`apps/desktop/src-tauri/target/release/bundle/dmg/LocalClaw_0.1.0_aarch64_simple.dmg`
+  - `codesign -dv` 显示 `.app` 为 `app bundle with Mach-O thin (arm64)`，签名状态为 `adhoc`
+
+### 后续动作
+- 个人测试、内测、朋友试用可直接使用当前 `.app` 或 `LocalClaw_0.1.0_aarch64_simple.dmg`。
+- 首次打开时需要提醒对方手动放行未签名应用。
+- 如果后续要修复 Tauri 自带的 fancy DMG 流程，再单独处理 `bundle_dmg.sh` 的 Finder/AppleScript 环节。
+
+## 2026-05-02 Q&A 记录 22
+
+### 问题
+- 用户要求补一套 Windows 版打包支持。
+
+### 结论
+- 已补齐 Windows 专用打包配置与脚本，但当前这台 macOS 主机不能直接产出 Windows 安装包。
+- 仓库现在支持在 Windows 主机上构建未签名的 `nsis` 安装器（`.exe`）和 `msi` 安装包（`.msi`）。
+- Windows 版默认使用 `downloadBootstrapper` 模式安装 WebView2，适合朋友试用和内测。
+
+### 证据
+- 新增文件：
+  - `apps/desktop/src-tauri/tauri.windows.conf.json`
+  - `apps/desktop/scripts/release-windows.ps1`
+  - `scripts/release-desktop-windows.ps1`
+  - `docs/windows-release.md`
+- 脚本入口：
+  - `apps/desktop/package.json` 新增 `release:windows`
+  - 根 `package.json` 新增 `release:desktop:windows`
+- 本机验证结果：
+  - `cargo tauri build --help` 在当前 macOS 主机仅暴露 `app,dmg` bundling
+  - 已安装 Rust target 只有 `aarch64-apple-darwin`
+  - 因此未在本机实际生成 Windows 包；当前实现属于“仓库支持已落地，待 Windows 主机执行”
+
+### 后续动作
+- 在 Windows 机器上准备 Node 24、pnpm、Rust/Tauri 环境后执行：
+  - `powershell -ExecutionPolicy Bypass -File .\scripts\release-desktop-windows.ps1`
+  - 或 `pnpm release:desktop:windows`
+- 产物将出现在：
+  - `apps/desktop/src-tauri/target/release/bundle/nsis/`
+  - `apps/desktop/src-tauri/target/release/bundle/msi/`
+- 如果后续需要正式分发，再额外补 Windows 代码签名。
+
+## 2026-05-13 Q&A 记录 23
+
+### 问题
+- 用户要求检查这个项目里哪些内容没有上传到 GitHub，并把这些规则优化写入 `.gitignore`。
+
+### 结论
+- 已优化根目录 `.gitignore`，将依赖目录、构建产物、环境变量文件、本地历史目录和 Tauri 运行时资源改为更通用的递归忽略规则。
+- 当前明确不会上传到 GitHub 的内容主要包括：各层级 `node_modules/`、`dist/`、`build/`、`coverage/`、`.env` 文件、`.DS_Store`，以及 `apps/desktop/src-tauri/resources/runtime/` 下的生成内容。
+- 仓库里还存在 5330 个“已被 Git 跟踪但现在匹配忽略规则”的文件；其中 5328 个在 `apps/desktop/src-tauri/target/`，2 个在 `.history/services/local-service/`。这些内容不会因为新增 `.gitignore` 自动从 GitHub 消失，后续需要单独执行索引清理。
+
+### 证据
+- 已修改文件：`.gitignore`
+- 新增规则位置：
+  - 依赖忽略：`.gitignore:1-3`
+  - 构建产物忽略：`.gitignore:5-14`
+  - 环境文件忽略且保留 `.env.example`：`.gitignore:16-22`
+  - 本地历史与桌面运行时资源忽略：`.gitignore:29-33`
+- `git status --short --ignored` 显示当前被忽略的典型内容包括：
+  - `services/local-service/.env`
+  - `services/local-service/dist/`
+  - `apps/web/dist/`
+  - `apps/desktop/src-tauri/resources/local-service/node_modules/`
+  - `apps/desktop/src-tauri/target/release/resources/local-service/.env`
+- `git ls-files -ci --exclude-standard | wc -l` 结果为 `5330`
+- `git ls-files -ci --exclude-standard` 聚合后主要来源为：
+  - `5328 apps/desktop/src-tauri`
+  - `2 .history/services/local-service`
+
+### 后续动作
+- 如需让 `target/` 和 `.history/` 中已跟踪内容也停止上传，后续执行一次 `git rm --cached -r apps/desktop/src-tauri/target .history`，再提交。
+- 如果你要，我下一步可以继续帮你清一版“已被跟踪但应该移出仓库”的文件，并给出最小化提交方案。

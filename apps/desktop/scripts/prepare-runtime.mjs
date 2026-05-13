@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { cpSync, mkdirSync, realpathSync, rmSync } from 'fs';
+import { cpSync, existsSync, mkdirSync, realpathSync, rmSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
@@ -34,7 +34,6 @@ function cleanAndPrepareDirs() {
 
 function copyRuntimeFiles() {
   const entriesToCopy = [
-    '.env',
     '.env.example',
     'package.json',
     'dist',
@@ -47,6 +46,14 @@ function copyRuntimeFiles() {
     const destination = path.resolve(localServiceOutDir, entry);
     cpSync(source, destination, {
       recursive: true,
+      force: true,
+      dereference: true,
+    });
+  }
+
+  const envSource = path.resolve(localServiceSrcDir, '.env');
+  if (existsSync(envSource)) {
+    cpSync(envSource, path.resolve(localServiceOutDir, '.env'), {
       force: true,
       dereference: true,
     });

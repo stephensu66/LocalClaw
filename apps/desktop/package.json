@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "prepare:runtime": "node ./scripts/prepare-runtime.mjs",
+    "release:macos": "bash ./scripts/release-macos.sh",
+    "release:windows": "powershell -ExecutionPolicy Bypass -File .\\scripts\\release-windows.ps1",
     "lint": "echo 'no lint'"
   },
   "dependencies": {

@@ -1,11 +1,33 @@
+# Dependencies
 node_modules/
+**/node_modules/
+
+# Build outputs
 dist/
 build/
+target/
+coverage/
+**/dist/
+**/build/
+**/target/
+**/coverage/
+.turbo/
 
+# Environment files
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Editor and OS files
 .DS_Store
+**/.DS_Store
 .vscode/
 
-.env
+# Local history
+.history/
 
-apps/desktop/src-tauri/resources/runtime/node
+# Generated desktop runtime resources
 apps/desktop/src-tauri/resources/runtime/
