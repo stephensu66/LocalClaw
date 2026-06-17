@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.guodongsu.localclaw",
   "build": {
-    "beforeBuildCommand": "cd ../../.. && pnpm --filter @openclaw/web build && pnpm --filter @openclaw/desktop prepare:runtime",
+    "beforeBuildCommand": "cd ../../.. && pnpm --filter @openclaw/shared build && pnpm --filter @openclaw/web build && pnpm --filter @openclaw/desktop prepare:runtime",
     "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:5173"
   },

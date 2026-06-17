@@ -11,6 +11,13 @@ function Ensure-Command($Name) {
   }
 }
 
+function Invoke-Checked($Command, [string[]]$Arguments) {
+  & $Command @Arguments
+  if ($LASTEXITCODE -ne 0) {
+    Fail "Command failed with exit code $LASTEXITCODE`: $Command $($Arguments -join ' ')"
+  }
+}
+
 function Get-NodeMajor {
   try {
     $version = node -p "process.versions.node"
@@ -48,7 +55,7 @@ $tauriDir = Join-Path $desktopDir "src-tauri"
 if (-not (Test-Path (Join-Path $repoRoot "node_modules"))) {
   Push-Location $repoRoot
   try {
-    pnpm install
+    Invoke-Checked "pnpm" @("install")
   } finally {
     Pop-Location
   }
@@ -56,7 +63,7 @@ if (-not (Test-Path (Join-Path $repoRoot "node_modules"))) {
 
 Push-Location $tauriDir
 try {
-  cargo tauri build --ci --bundles nsis,msi --no-sign
+  Invoke-Checked "cargo" @("tauri", "build", "--ci", "--bundles", "nsis,msi", "--no-sign")
 } finally {
   Pop-Location
 }
