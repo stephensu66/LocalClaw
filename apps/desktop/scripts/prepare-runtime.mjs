@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
-import { cpSync, existsSync, mkdirSync, realpathSync, rmSync } from 'fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
+import { createRequire } from 'module';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,20 +15,9 @@ const localServiceSrcDir = path.resolve(repoRoot, 'services/local-service');
 const resourcesDir = path.resolve(desktopDir, 'src-tauri/resources');
 const localServiceOutDir = path.resolve(resourcesDir, 'local-service');
 
-function quoteShellArg(input) {
-  return `"${String(input).replace(/"/g, '\\"')}"`;
-}
-
 function run(command, args, cwd = repoRoot) {
   const rendered = [command, ...args].join(' ');
-  const result = process.platform === 'win32'
-    ? spawnSync([command, ...args].map(quoteShellArg).join(' '), {
-      cwd,
-      stdio: 'inherit',
-      env: process.env,
-      shell: true,
-    })
-    : spawnSync(command, args, {
+  const result = spawnSync(command, args, {
     cwd,
     stdio: 'inherit',
     env: process.env,
@@ -38,6 +28,25 @@ function run(command, args, cwd = repoRoot) {
   if (result.status !== 0) {
     throw new Error(`Command failed (${result.status}): ${rendered}`);
   }
+}
+
+function resolvePackageBin(packageName, binName, cwd) {
+  const requireFromPackage = createRequire(path.join(cwd, 'package.json'));
+  const packageJsonPath = requireFromPackage.resolve(`${packageName}/package.json`);
+  const packageDir = path.dirname(packageJsonPath);
+  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+  const bin = typeof packageJson.bin === 'string' ? packageJson.bin : packageJson.bin?.[binName];
+
+  if (!bin) {
+    throw new Error(`Unable to resolve ${binName} bin for package ${packageName}`);
+  }
+
+  return path.resolve(packageDir, bin);
+}
+
+function runPackageBin(packageName, binName, args, cwd) {
+  const binPath = resolvePackageBin(packageName, binName, cwd);
+  run(process.execPath, [binPath, ...args], cwd);
 }
 
 function cleanAndPrepareDirs() {
@@ -94,9 +103,9 @@ function copyPrismaRuntimeDeps() {
 function main() {
   cleanAndPrepareDirs();
 
-  run('pnpm', ['--filter', '@openclaw/shared', 'build']);
-  run('pnpm', ['--filter', '@openclaw/local-service', 'prisma:generate']);
-  run('pnpm', ['--filter', '@openclaw/local-service', 'build']);
+  runPackageBin('typescript', 'tsc', ['-p', path.resolve(repoRoot, 'packages/shared/tsconfig.json')], repoRoot);
+  runPackageBin('prisma', 'prisma', ['generate'], localServiceSrcDir);
+  runPackageBin('tsup', 'tsup', ['--config', 'tsup.config.ts'], localServiceSrcDir);
 
   copyRuntimeFiles();
   copyPrismaRuntimeDeps();
