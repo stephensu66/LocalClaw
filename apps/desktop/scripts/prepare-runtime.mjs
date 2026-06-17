@@ -14,15 +14,32 @@ const localServiceSrcDir = path.resolve(repoRoot, 'services/local-service');
 const resourcesDir = path.resolve(desktopDir, 'src-tauri/resources');
 const localServiceOutDir = path.resolve(resourcesDir, 'local-service');
 
+function resolveCommand(command) {
+  if (process.platform !== 'win32') {
+    return command;
+  }
+
+  if (command === 'pnpm') {
+    return 'pnpm.cmd';
+  }
+
+  return command;
+}
+
 function run(command, args, cwd = repoRoot) {
-  const result = spawnSync(command, args, {
+  const executable = resolveCommand(command);
+  const result = spawnSync(executable, args, {
     cwd,
     stdio: 'inherit',
     env: process.env,
   });
+  if (result.error) {
+    const rendered = [command, ...args].join(' ');
+    throw new Error(`Command failed to start: ${rendered}\n${result.error.message}`);
+  }
   if (result.status !== 0) {
     const rendered = [command, ...args].join(' ');
-    throw new Error(`Command failed (${result.status ?? 'unknown'}): ${rendered}`);
+    throw new Error(`Command failed (${result.status}): ${rendered}`);
   }
 }
 
