@@ -10,6 +10,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@openclaw/web-app': path.resolve(__dirname, '../web/src'),
+      '@openclaw/shared': path.resolve(__dirname, '../../packages/shared/src'),
     },
   },
 });

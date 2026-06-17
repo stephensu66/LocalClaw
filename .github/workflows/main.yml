@@ -50,6 +50,22 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Print tool versions
+        shell: pwsh
+        run: |
+          git rev-parse HEAD
+          node --version
+          pnpm --version
+          rustc --version
+          cargo --version
+
+      - name: Validate web and runtime build
+        shell: pwsh
+        run: |
+          pnpm --filter @openclaw/shared build
+          pnpm --filter @openclaw/web build
+          pnpm --filter @openclaw/desktop prepare:runtime
+
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2.0" --locked
 
