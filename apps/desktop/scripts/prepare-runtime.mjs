@@ -14,24 +14,12 @@ const localServiceSrcDir = path.resolve(repoRoot, 'services/local-service');
 const resourcesDir = path.resolve(desktopDir, 'src-tauri/resources');
 const localServiceOutDir = path.resolve(resourcesDir, 'local-service');
 
-function resolveCommand(command) {
-  if (process.platform !== 'win32') {
-    return command;
-  }
-
-  if (command === 'pnpm') {
-    return 'pnpm.cmd';
-  }
-
-  return command;
-}
-
 function run(command, args, cwd = repoRoot) {
-  const executable = resolveCommand(command);
-  const result = spawnSync(executable, args, {
+  const result = spawnSync(command, args, {
     cwd,
     stdio: 'inherit',
     env: process.env,
+    shell: process.platform === 'win32',
   });
   if (result.error) {
     const rendered = [command, ...args].join(' ');
