@@ -14,19 +14,28 @@ const localServiceSrcDir = path.resolve(repoRoot, 'services/local-service');
 const resourcesDir = path.resolve(desktopDir, 'src-tauri/resources');
 const localServiceOutDir = path.resolve(resourcesDir, 'local-service');
 
+function quoteShellArg(input) {
+  return `"${String(input).replace(/"/g, '\\"')}"`;
+}
+
 function run(command, args, cwd = repoRoot) {
-  const result = spawnSync(command, args, {
+  const rendered = [command, ...args].join(' ');
+  const result = process.platform === 'win32'
+    ? spawnSync([command, ...args].map(quoteShellArg).join(' '), {
+      cwd,
+      stdio: 'inherit',
+      env: process.env,
+      shell: true,
+    })
+    : spawnSync(command, args, {
     cwd,
     stdio: 'inherit',
     env: process.env,
-    shell: process.platform === 'win32',
   });
   if (result.error) {
-    const rendered = [command, ...args].join(' ');
     throw new Error(`Command failed to start: ${rendered}\n${result.error.message}`);
   }
   if (result.status !== 0) {
-    const rendered = [command, ...args].join(' ');
     throw new Error(`Command failed (${result.status}): ${rendered}`);
   }
 }
